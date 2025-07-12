@@ -7,6 +7,8 @@
 - [x] プロジェクトのセットアップ。必要なライブラリをインストールする。
 - [x] データベースのマイグレーションをする。
 - [ ] APIのエンドポイントを一つ作成する。認証が不要なやつ。
+	- [x] エンドポイントの定義を作成する
+	- [ ] データベースからデータを取得して返すようにする
 - [ ] テストを書く。Postmanのテストの実行方法も確認しておく。
 - [ ] 認証機能を実装する。
 - [ ] APIを順番に実装していく。
@@ -39,6 +41,71 @@ export default {
 ---
 
 タグのエンドポイントを作成して、他のAPIエンドポイントも一緒に定義しておこうと思います。
+
+次はタグをDBから取得する処理を実装しましょう。D1のbindingsをEffect側に渡します。
+
+D1Client.layer（SQLクライアントの実態）にはD1Databaseが必要で、作成したレイヤーをhandlerに渡す必要があるので、D1Databaseを受け取ってhandlerを返す関数を作るとよいでしょう。まずAPI側でSQLクライアントを呼び出してみて、依存がどうなるかを見てみます。
+
+```ts
+export function createWebHandler({
+	db,
+}: {
+	db: D1Database;
+}): ReturnType<typeof HttpApiBuilder.toWebHandler> {
+	const SqlLive = D1Client.layer({ db });
+	const ConduitApiLive = HttpApiBuilder.api(ConduitApi).pipe(
+		Layer.provide(tagsLive),
+		Layer.provide(usersLive),
+		Layer.provide(SqlLive),
+	);
+
+	const SwaggerLive = HttpApiSwagger.layer().pipe(Layer.provide(ConduitApiLive));
+
+	return HttpApiBuilder.toWebHandler(
+		Layer.mergeAll(ConduitApiLive, SwaggerLive, HttpServer.layerContext),
+	);
+}
+```
+
+APIエンドポイント側の定義です。SQLのエラーをHTTPのエラーに変換しないとエラーになるので、変換処理が必要でした。エラーハンドリングClaudeに書いてもらったので、ちゃんと型エラーや型定義を確認して自分で修正できるようにしたい。
+
+```ts
+import { HttpApiBuilder, HttpApiError } from '@effect/platform';
+import { ConduitApi } from './api';
+import { Effect } from 'effect';
+import { SqlClient } from '@effect/sql';
+
+export const tagsLive = HttpApiBuilder.group(ConduitApi, 'Tags', (handlers) =>
+	handlers.handle('getTags', () =>
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient;
+
+			const tags = yield* sql<{
+				readonly id: number;
+				readonly name: string;
+			}>`SELECT id, name FROM Tag`.pipe(
+				Effect.mapError(() => new HttpApiError.InternalServerError()),
+			);
+
+			return { tags: tags.map((tag) => tag.name) };
+		}),
+	),
+);
+```
+
+スローするエラーはあらかじめAPIの定義の方に含める必要があるみたい。仕様→実装の順で進める必要がありますね。
+
+```ts
+const getTags = HttpApiEndpoint.get('getTags', '/tags')
+	.addSuccess(tagsResponse)
+	.addError(HttpApiError.InternalServerError);
+```
+
+以下のコマンドでデータベースにデータを追加し、APIレスポンスに含まれることを確認した。
+
+```bash
+npx wrangler d1 execute realworld-effect --command="INSERT INTO Tag (name) VALUES ('javascript')"
+```
 
 ### プロジェクトのセットアップ
 
