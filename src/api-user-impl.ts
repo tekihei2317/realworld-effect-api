@@ -3,5 +3,9 @@ import { ConduitApi } from './api';
 import { Effect } from 'effect';
 
 export const usersLive = HttpApiBuilder.group(ConduitApi, 'Users', (handlers) =>
-	handlers.handle('getCurrentUser', () => Effect.succeed(undefined)),
+	handlers.handle('getCurrentUser', () =>
+		Effect.gen(function* () {
+			return undefined;
+		}),
+	),
 );
