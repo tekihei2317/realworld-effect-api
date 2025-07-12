@@ -1,7 +1,7 @@
 import { HttpApiBuilder } from '@effect/platform';
 import { ConduitApi } from './api';
 import { Effect } from 'effect';
-import { Authorization, CurrentUser } from './shared';
+import { CurrentUser } from './authentication';
 
 export const usersLive = HttpApiBuilder.group(ConduitApi, 'Users', (handlers) =>
 	handlers

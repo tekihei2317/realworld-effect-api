@@ -4,7 +4,7 @@ import { ConduitApi } from './api';
 import { tagsLive } from './api-tag-impl';
 import { usersLive } from './api-user-impl';
 import { D1Client } from '@effect/sql-d1';
-import { AuthorizationLive } from './shared';
+import { AuthorizationLive } from './authentication';
 
 export function createWebHandler({
 	db,

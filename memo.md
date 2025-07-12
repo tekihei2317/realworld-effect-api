@@ -27,6 +27,8 @@ Bearerトークンの認証が用意されているが、使い方が分から�
 
 Authorizationをprovideしないといけないんだけど、どうしようね。
 
+分からなかったのでClaude Codeに書き進めてもらう。HttpApiSecurityを使って新しいルールを作ればいいらしい。
+
 
 ### 残りのAPIエンドポイントの定義を作成していく
 
