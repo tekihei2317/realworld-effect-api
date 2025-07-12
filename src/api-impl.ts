@@ -4,6 +4,7 @@ import { ConduitApi } from './api';
 import { tagsLive } from './api-tag-impl';
 import { usersLive } from './api-user-impl';
 import { D1Client } from '@effect/sql-d1';
+import { AuthorizationLive } from './shared';
 
 export function createWebHandler({
 	db,
@@ -14,6 +15,7 @@ export function createWebHandler({
 	const ConduitApiLive = HttpApiBuilder.api(ConduitApi).pipe(
 		Layer.provide(tagsLive),
 		Layer.provide(usersLive),
+		Layer.provide(AuthorizationLive),
 		Layer.provide(SqlLive),
 	);
 

@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiError, HttpApiGroup } from '@effect/platform';
 import { Schema } from 'effect';
-import { GenericError } from './shared';
+import { Authorization, GenericError } from './shared';
 
 const LoginUserRequest = Schema.Struct({
 	user: Schema.Struct({
@@ -51,7 +51,8 @@ const createUser = HttpApiEndpoint.post('createUser', '/users')
 const getCurrentUser = HttpApiEndpoint.get('getCurrentUser', '/user')
 	.addSuccess(UserResponse)
 	.addError(HttpApiError.Unauthorized)
-	.addError(GenericError, { status: 422 });
+	.addError(GenericError, { status: 422 })
+	.middleware(Authorization);
 
 const updateCurrentUser = HttpApiEndpoint.put('updateCurrentUser', '/user')
 	.setPayload(UpdateUserRequest)
