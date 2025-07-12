@@ -17,5 +17,11 @@
 		"typescript": "^5.5.2",
 		"vitest": "~3.2.0",
 		"wrangler": "^4.24.3"
+	},
+	"dependencies": {
+		"@effect/platform": "^0.87.12",
+		"@effect/sql": "^0.40.13",
+		"@effect/sql-d1": "^0.38.13",
+		"effect": "^3.16.12"
 	}
 }
