@@ -6,10 +6,129 @@
 - [x] データモデリングする。
 - [x] プロジェクトのセットアップ。必要なライブラリをインストールする。
 - [x] データベースのマイグレーションをする。
-- [ ] APIのエンドポイントを一つ作成する。認証が不要なやつ。
+- [x] APIのエンドポイントを一つ作成する。認証が不要なやつ。
+	- [x] エンドポイントの定義を作成する
+	- [x] データベースからデータを取得して返すようにする
+- [x] 残りのAPIエンドポイントの定義を作成していく。
+	- とりあえず認証だけ書いておいた
 - [ ] テストを書く。Postmanのテストの実行方法も確認しておく。
 - [ ] 認証機能を実装する。
 - [ ] APIを順番に実装していく。
+
+### 残りのAPIエンドポイントの定義を作成していく
+
+認証関係を最初に実装するので、まずは認証とユーザーに関するAPIエンドポイントの定義のみを作成する。
+
+`HttpApiEndpoint`で、リクエストボディの定義は`setPayload`、レスポンスの定義は`addSuccess`にスキーマを指定して行う。
+
+次はエラー関係と、ステータスコードの設定を行う。`addSuccess`のステータスコードはデフォルトで200だが、オプションで変更することができる。
+
+ユーザー関係のAPIのエラーには次のものがある。401はログインしていないときのエラーだが、ログインAPIでの401エラーはどういう状況で出すのか分からない。カレントユーザー情報取得の422も、リクエストボディがないので不明。
+
+- ログイン: 401、422
+- ユーザー登録: 422
+- カレントユーザー情報取得: 401、422
+- カレントーユーザー情報更新: 401、422
+
+422の時のエラー情報は、`{ errors: { body: ['message1', 'message2'] } }`のフォーマットで返せばよい。
+
+独自のエラーを定義する場合は、`Schema.TaggedError`を使う。できれば`HttpApiError`の定義を参考にして422を返すようなエラークラスを作成したいが、また今度。また、スキーマのパースに失敗した場合は400を返すようになっているので、これをカスタマイズする必要もありそうだ。
+
+### APIのエンドポイントを一つ作成する
+
+[How to implement a backend with Effect | Typeonce](https://www.typeonce.dev/article/how-to-implement-a-backend-with-effect)
+
+ 次はAPIのエンドポイントを作成します。まずは認証が不要なAPIを一つ、タグの一覧取得APIを作成したいと思います。
+
+まずは、`@effect/platform`のAPIの定義方法に関するドキュメントを読みます。
+
+[effect/packages/platform/README.md at main · Effect-TS/effect](https://github.com/Effect-TS/effect/blob/main/packages/platform/README.md)
+
+Node.jsじゃないから少し読み飛ばす。Swaggerもwrangler環境で用意できるか試しておこう。
+
+```ts
+import { handler, dispose } from './api';
+
+export default {
+	async fetch(request, env, ctx): Promise<Response> {
+		const response = await handler(request);
+		await dispose();
+
+		return response;
+	},
+} satisfies ExportedHandler<Env>;
+```
+
+これで http://localhost:8787 でAPIサーバーが動いてHello, worldが返ってきました。Swaggerも追加できた。すげ〜。
+
+---
+
+タグのエンドポイントを作成して、他のAPIエンドポイントも一緒に定義しておこうと思います。
+
+次はタグをDBから取得する処理を実装しましょう。D1のbindingsをEffect側に渡します。
+
+D1Client.layer（SQLクライアントの実態）にはD1Databaseが必要で、作成したレイヤーをhandlerに渡す必要があるので、D1Databaseを受け取ってhandlerを返す関数を作るとよいでしょう。まずAPI側でSQLクライアントを呼び出してみて、依存がどうなるかを見てみます。
+
+```ts
+export function createWebHandler({
+	db,
+}: {
+	db: D1Database;
+}): ReturnType<typeof HttpApiBuilder.toWebHandler> {
+	const SqlLive = D1Client.layer({ db });
+	const ConduitApiLive = HttpApiBuilder.api(ConduitApi).pipe(
+		Layer.provide(tagsLive),
+		Layer.provide(usersLive),
+		Layer.provide(SqlLive),
+	);
+
+	const SwaggerLive = HttpApiSwagger.layer().pipe(Layer.provide(ConduitApiLive));
+
+	return HttpApiBuilder.toWebHandler(
+		Layer.mergeAll(ConduitApiLive, SwaggerLive, HttpServer.layerContext),
+	);
+}
+```
+
+APIエンドポイント側の定義です。SQLのエラーをHTTPのエラーに変換しないとエラーになるので、変換処理が必要でした。エラーハンドリングClaudeに書いてもらったので、ちゃんと型エラーや型定義を確認して自分で修正できるようにしたい。
+
+```ts
+import { HttpApiBuilder, HttpApiError } from '@effect/platform';
+import { ConduitApi } from './api';
+import { Effect } from 'effect';
+import { SqlClient } from '@effect/sql';
+
+export const tagsLive = HttpApiBuilder.group(ConduitApi, 'Tags', (handlers) =>
+	handlers.handle('getTags', () =>
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient;
+
+			const tags = yield* sql<{
+				readonly id: number;
+				readonly name: string;
+			}>`SELECT id, name FROM Tag`.pipe(
+				Effect.mapError(() => new HttpApiError.InternalServerError()),
+			);
+
+			return { tags: tags.map((tag) => tag.name) };
+		}),
+	),
+);
+```
+
+スローするエラーはあらかじめAPIの定義の方に含める必要があるみたい。仕様→実装の順で進める必要がありますね。
+
+```ts
+const getTags = HttpApiEndpoint.get('getTags', '/tags')
+	.addSuccess(tagsResponse)
+	.addError(HttpApiError.InternalServerError);
+```
+
+以下のコマンドでデータベースにデータを追加し、APIレスポンスに含まれることを確認した。
+
+```bash
+npx wrangler d1 execute realworld-effect --command="INSERT INTO Tag (name) VALUES ('javascript')"
+```
 
 ### プロジェクトのセットアップ
 
