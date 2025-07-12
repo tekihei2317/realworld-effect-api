@@ -11,6 +11,35 @@
 - [ ] 認証機能を実装する。
 - [ ] APIを順番に実装していく。
 
+### APIのエンドポイントを一つ作成する
+
+ 次はAPIのエンドポイントを作成します。まずは認証が不要なAPIを一つ、タグの一覧取得APIを作成したいと思います。
+
+まずは、`@effect/platform`のAPIの定義方法に関するドキュメントを読みます。
+
+[effect/packages/platform/README.md at main · Effect-TS/effect](https://github.com/Effect-TS/effect/blob/main/packages/platform/README.md)
+
+Node.jsじゃないから少し読み飛ばす。Swaggerもwrangler環境で用意できるか試しておこう。
+
+```ts
+import { handler, dispose } from './api';
+
+export default {
+	async fetch(request, env, ctx): Promise<Response> {
+		const response = await handler(request);
+		await dispose();
+
+		return response;
+	},
+} satisfies ExportedHandler<Env>;
+```
+
+これで http://localhost:8787 でAPIサーバーが動いてHello, worldが返ってきました。Swaggerも追加できた。すげ〜。
+
+---
+
+タグのエンドポイントを作成して、他のAPIエンドポイントも一緒に定義しておこうと思います。
+
 ### プロジェクトのセットアップ
 
 EffectのAPIをCloudflare Workersにデプロイするには？プロジェクトはどうセットアップすればよい？
