@@ -20,7 +20,7 @@ export const User = Schema.Struct({
 
 export type User = Schema.Schema.Type<typeof User>;
 
-const UserResponse = Schema.Struct({
+export const UserResponse = Schema.Struct({
 	user: User,
 });
 

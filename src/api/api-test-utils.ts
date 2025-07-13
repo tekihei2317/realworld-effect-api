@@ -1,17 +1,18 @@
 import { Effect, Layer } from 'effect';
 import { HttpApiBuilder, HttpServer } from '@effect/platform';
 import { SqliteClient } from '@effect/sql-sqlite-node';
-import { ConduitApi } from '../src/api/schema';
-import { tagsLive } from '../src/api/api-tag-impl';
-import { usersLive } from '../src/api/api-user-impl';
-import { AuthorizationLive } from '../src/authentication';
-import * as fs from 'node:fs/promises';
-import path from 'node:path';
 import { Reactivity } from '@effect/experimental';
 import { SqlClient } from '@effect/sql';
+import * as fs from 'node:fs/promises';
+import path from 'node:path';
+
+import { ConduitApi } from './schema';
+import { tagsLive } from './api-tag-impl';
+import { usersLive } from './api-user-impl';
+import { AuthorizationLive } from '../authentication';
 
 const loadMigration = async () => {
-	return fs.readFile(path.resolve(__dirname, '../migrations/0001_init.sql'), 'utf-8');
+	return fs.readFile(path.resolve(__dirname, '../../migrations/0001_init.sql'), 'utf-8');
 };
 
 const sqlClient = SqliteClient.make({
@@ -21,11 +22,7 @@ const sqlClient = SqliteClient.make({
 export const testSqlClient = Effect.gen(function* () {
 	const sql = yield* sqlClient;
 	const migrationSql = yield* Effect.promise(() => loadMigration());
-
-	const statements = migrationSql
-		.split(';')
-		.map((stmt) => stmt.trim())
-		.filter((stmt) => stmt && !stmt.startsWith('--'));
+	const statements = migrationSql.split(';').map((stmt) => stmt.trim());
 
 	for (const statement of statements) {
 		if (statement) {

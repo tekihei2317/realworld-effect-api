@@ -3,6 +3,11 @@
 	"compilerOptions": {
 		"types": ["@cloudflare/vitest-pool-workers"]
 	},
-	"include": ["./**/*.ts", "../worker-configuration.d.ts", "../src/api/tags.spec.ts"],
+	"include": [
+		"./**/*.ts",
+		"../worker-configuration.d.ts",
+		"../src/api/tags.spec.ts",
+		"../src/api/api-test-utils.ts"
+	],
 	"exclude": []
 }
