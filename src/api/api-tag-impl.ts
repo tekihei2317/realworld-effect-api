@@ -1,5 +1,5 @@
 import { HttpApiBuilder, HttpApiError } from '@effect/platform';
-import { ConduitApi } from './api';
+import { ConduitApi } from './schema';
 import { Effect } from 'effect';
 import { SqlClient } from '@effect/sql';
 

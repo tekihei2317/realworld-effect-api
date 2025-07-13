@@ -1,7 +1,7 @@
 import { HttpApiEndpoint, HttpApiError, HttpApiGroup } from '@effect/platform';
 import { Schema } from 'effect';
-import { GenericError } from './shared';
-import { Authorization } from './authentication';
+import { GenericError } from '../shared';
+import { Authorization } from '../../authentication';
 
 const LoginUserRequest = Schema.Struct({
 	user: Schema.Struct({

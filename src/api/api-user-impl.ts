@@ -1,13 +1,12 @@
 import { HttpApiBuilder } from '@effect/platform';
-import { ConduitApi } from './api';
+import { ConduitApi } from './schema';
 import { Effect } from 'effect';
-import { CurrentUser } from './authentication';
-import { generateJWT } from './jwt';
+import { CurrentUser } from '../authentication';
+import { generateJWT } from '../jwt';
 import { GenericError } from './shared';
 import { SqlClient } from '@effect/sql';
-import { InternalServerError } from '@effect/platform/HttpApiError';
-import type { User } from './api-user';
-import { hashPassword, verifyPassword } from './password';
+import type { User } from './schema/api-user';
+import { hashPassword, verifyPassword } from '../password';
 
 export const usersLive = HttpApiBuilder.group(ConduitApi, 'Users', (handlers) =>
 	handlers
