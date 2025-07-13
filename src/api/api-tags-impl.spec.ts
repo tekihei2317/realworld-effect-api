@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Effect } from 'effect';
-import { testSqlClient, testWebHandler } from './api-test-utils';
+import { testSqlClient, testWebHandler } from '../../test/api-test-utils';
 import { SqlClient } from '@effect/sql';
 
 describe('Tags API', () => {

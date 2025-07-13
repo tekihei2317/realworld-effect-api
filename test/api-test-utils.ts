@@ -1,9 +1,9 @@
 import { Effect, Layer } from 'effect';
 import { HttpApiBuilder, HttpServer } from '@effect/platform';
 import { SqliteClient } from '@effect/sql-sqlite-node';
-import { ConduitApi } from '../src/api';
-import { tagsLive } from '../src/api-tag-impl';
-import { usersLive } from '../src/api-user-impl';
+import { ConduitApi } from '../src/api/schema';
+import { tagsLive } from '../src/api/api-tag-impl';
+import { usersLive } from '../src/api/api-user-impl';
 import { AuthorizationLive } from '../src/authentication';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
