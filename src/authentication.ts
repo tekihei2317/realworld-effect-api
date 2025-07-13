@@ -1,5 +1,6 @@
 import { HttpApiMiddleware, HttpApiSchema, HttpApiSecurity } from '@effect/platform';
 import { Context, Effect, Layer, Redacted, Schema } from 'effect';
+import { verifyJWT } from './jwt';
 
 export class GenericError extends Schema.TaggedError<GenericError>()('GenericError', {}) {}
 
@@ -14,16 +15,11 @@ const TokenSecurity = HttpApiSecurity.apiKey({
 	in: 'header',
 });
 
-// const User = Schema.Struct({
-// 	// bio: Schema.String,
-// 	// email: Schema.String,
-// 	// image: Schema.String,
-// 	// token: Schema.String,
-// 	// username: Schema.String,
-// 	id: Schema.Number,
-// });
-
-class User extends Schema.Class<User>('User')({ id: Schema.Number }) {}
+class User extends Schema.Class<User>('User')({
+	id: Schema.String,
+	username: Schema.String,
+	email: Schema.String,
+}) {}
 
 export class CurrentUser extends Context.Tag('CurrentUser')<CurrentUser, User>() {}
 
@@ -35,21 +31,16 @@ export class Authorization extends HttpApiMiddleware.Tag<Authorization>()('Autho
 	},
 }) {}
 
-// JWT検証関数（スタブ）
-const validateJWTToken = (token: string): Effect.Effect<number, Unauthorized> =>
+// JWT検証関数
+const validateJWTToken = (token: string): Effect.Effect<User, Unauthorized> =>
 	Effect.gen(function* () {
-		yield* Effect.log('validating JWT token', Redacted.make(token));
+		const payload = yield* verifyJWT(token).pipe(Effect.mapError(() => new Unauthorized()));
 
-		// TODO: 実際のJWT検証を実装
-		// - トークンの署名検証
-		// - 有効期限チェック
-		// - ユーザーIDの抽出
-
-		if (token === 'invalid') {
-			yield* Effect.fail(new Unauthorized());
-		}
-
-		return 1; // スタブとしてユーザーID=1を返す
+		return new User({
+			id: payload.sub,
+			username: payload.username,
+			email: payload.email,
+		});
 	});
 
 export const AuthorizationLive = Layer.effect(
@@ -70,9 +61,9 @@ export const AuthorizationLive = Layer.effect(
 
 					// JWT検証
 					const jwtToken = headerValue.slice(6);
-					const userId = yield* validateJWTToken(jwtToken);
+					const user = yield* validateJWTToken(jwtToken);
 
-					return new User({ id: userId });
+					return user;
 				}),
 		};
 	}),

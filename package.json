@@ -22,6 +22,8 @@
 		"@effect/platform": "^0.87.12",
 		"@effect/sql": "^0.40.13",
 		"@effect/sql-d1": "^0.38.13",
-		"effect": "^3.16.12"
+		"bcryptjs": "^3.0.2",
+		"effect": "^3.16.12",
+		"jose": "^6.0.11"
 	}
 }

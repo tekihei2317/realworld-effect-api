@@ -10,13 +10,15 @@ const LoginUserRequest = Schema.Struct({
 	}),
 });
 
-const User = Schema.Struct({
+export const User = Schema.Struct({
 	bio: Schema.String,
 	email: Schema.String,
 	image: Schema.String,
 	token: Schema.String,
 	username: Schema.String,
 });
+
+export type User = Schema.Schema.Type<typeof User>;
 
 const UserResponse = Schema.Struct({
 	user: User,
