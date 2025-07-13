@@ -7,7 +7,7 @@ import { GenericError } from './shared';
 import { SqlClient } from '@effect/sql';
 import { InternalServerError } from '@effect/platform/HttpApiError';
 import type { User } from './api-user';
-import { hashPassword } from './password';
+import { hashPassword, verifyPassword } from './password';
 
 export const usersLive = HttpApiBuilder.group(ConduitApi, 'Users', (handlers) =>
 	handlers
@@ -35,27 +35,52 @@ export const usersLive = HttpApiBuilder.group(ConduitApi, 'Users', (handlers) =>
 		)
 		.handle('login', ({ payload }) =>
 			Effect.gen(function* () {
-				// TODO: 実際のデータベースでメール・パスワード検証
-				// const dbUser = yield* userRepository.findByEmail(payload.user.email);
-				// const isValid = yield* verifyPassword(payload.user.password, dbUser.passwordHash);
+				const sql = yield* SqlClient.SqlClient;
 
-				// スタブとしてサンプルユーザーを返す
-				const userInfo = {
-					id: '1',
-					username: 'john_doe',
-					email: payload.user.email,
-				};
+				// メールアドレスでユーザー検索
+				const userResult = yield* sql<{
+					id: number;
+					username: string;
+					bio: string | null;
+					profileImageUrl: string | null;
+					email: string;
+					passwordHash: string;
+				}>`
+					SELECT u.id, u.username, u.bio, u.profileImageUrl, a.email, a.passwordHash
+					FROM User u
+					JOIN Auth a ON u.id = a.userId
+					WHERE a.email = ${payload.user.email}
+				`.pipe(Effect.mapError(() => new GenericError()));
 
-				// JWTトークンを生成
-				const token = yield* generateJWT(userInfo).pipe(Effect.mapError(() => new GenericError()));
+				if (userResult.length === 0) {
+					yield* Effect.fail(new GenericError());
+				}
+
+				const dbUser = userResult[0];
+
+				// パスワード検証
+				const isValid = yield* verifyPassword(payload.user.password, dbUser.passwordHash).pipe(
+					Effect.mapError(() => new GenericError()),
+				);
+
+				if (!isValid) {
+					yield* Effect.fail(new GenericError());
+				}
+
+				// JWT生成
+				const token = yield* generateJWT({
+					id: dbUser.id.toString(),
+					username: dbUser.username,
+					email: dbUser.email,
+				}).pipe(Effect.mapError(() => new GenericError()));
 
 				return {
 					user: {
-						bio: 'I work at statefarm',
-						email: userInfo.email,
-						image: 'https://i.stack.imgur.com/xHWG8.jpg',
+						bio: dbUser.bio || '',
+						email: dbUser.email,
+						image: dbUser.profileImageUrl || '',
 						token,
-						username: userInfo.username,
+						username: dbUser.username,
 					},
 				};
 			}),
