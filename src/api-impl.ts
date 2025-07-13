@@ -1,5 +1,11 @@
-import { HttpApiBuilder, HttpServer, HttpApiSwagger } from '@effect/platform';
-import { Layer } from 'effect';
+import {
+	HttpApiBuilder,
+	HttpServer,
+	HttpApiSwagger,
+	HttpApiClient,
+	FetchHttpClient,
+} from '@effect/platform';
+import { Effect, Layer } from 'effect';
 import { ConduitApi } from './api';
 import { tagsLive } from './api-tag-impl';
 import { usersLive } from './api-user-impl';
