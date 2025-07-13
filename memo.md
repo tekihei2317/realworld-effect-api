@@ -43,6 +43,33 @@
 
 あと、このタイプのテストはNode.jsで実行するので、Vitestのプロジェクトを定義してCloudflare Workersのテストとは別の環境で実行できるようにする。
 
+Webハンドラーを作成する処理を別ファイルに抽出した。testSqlClientを直接使っているが、テストコード側でDBにデータを入れるので、DBクライアントを渡せるように変更する必要がある。
+
+```ts
+export const testWebHandler = Effect.gen(function* () {
+	const sql = yield* testSqlClient;
+
+	const apiLive = HttpApiBuilder.api(ConduitApi).pipe(
+		Layer.provide(tagsLive),
+		Layer.provide(usersLive),
+		Layer.provide(AuthorizationLive),
+		Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
+	);
+
+	const webHandler = HttpApiBuilder.toWebHandler(Layer.mergeAll(apiLive, HttpServer.layerContext));
+
+	return webHandler;
+});
+```
+
+テスト用のクライアントの型が`Effect.Effect<SqlClient, SqlError, Scope>`で、これを`SqlClient`を必要とするエフェクトに渡してから実行したい。どうすればいい？
+
+エフェクトの中でyield*してSqlClientを取り出してから、provideServiceを実行するとできた。これでいいのかな。
+
+それから、Layer.Effectでレイヤーを作ってからLayer.provideするとかもできるかも？←やってみたけど分からなかった。
+
+SqlClientを各テストで使い回そうと思ったけれど、`yield*`する度に毎回作成されているような気がする。Effectを返す関数じゃなくて、Effectを返すだけでもリセットされそうだ。←そうでした。毎回create tableでスキーマ作ってるので、そこは今後改善の必要があるかも。
+
 ### 認証機能を実装する
 
 まず、認証機能を実装するにあたって必要そうな、ミドルウェアなどの機能を確認する。

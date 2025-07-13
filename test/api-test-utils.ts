@@ -32,12 +32,11 @@ export const testSqlClient = Effect.gen(function* () {
 			yield* sql.unsafe(statement);
 		}
 	}
-
 	return sql;
 });
 
 export const testWebHandler = Effect.gen(function* () {
-	const sql = yield* testSqlClient;
+	const sql = yield* SqlClient.SqlClient;
 
 	const apiLive = HttpApiBuilder.api(ConduitApi).pipe(
 		Layer.provide(tagsLive),
