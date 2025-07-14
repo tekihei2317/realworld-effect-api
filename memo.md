@@ -24,6 +24,7 @@
 - EffectのAPIのテスト方法。HTTPのエンドポイントを直接実行したい。テスト用にインメモリDBを使うのもできると思う。
 - @effect/sqlのAPI。色々あるのでそれぞれがどのようなもので、どう使い分けるのかを知りたい。sqlタグで簡潔に書きたいが
 - エラーハンドリング。コンパイルエラーが出たら都度mapErrorしてその場しのぎしてるのでちゃんとやりたい。
+- Data.TaggedErrorとSchema.TaggedErrorの違いは？
 
 ### 認証のAPIのテストを実装する
 
@@ -43,6 +44,44 @@
 	- ログインしていない場合は認証エラーになること
 - ユーザー情報更新
 	- 未実装
+
+ユーザー登録APIのテストを実装中。現在はどこでエラーが出ているか分からないので、異常系のテストを書きながらエラーハンドリングを改善していこう。
+
+エラーメッセージの内容は特に決まっていないと思うので、分かりやすく書く。まずはEffectのエラーハンドリングの方法を調べよう。
+
+[Expected Errors | Effect Documentation](https://effect.website/docs/error-management/expected-errors/)
+
+エラーを定義するには`Data.TaggedError`を使う？`Schema.TaggedError`を使う？
+
+エラーを表すエフェクトを作るには、`Effect.fail`を使う
+
+エラーインスタンスには`_tag`というフィールドが自動で追加され、これは`Effect.catchTag`で特定のエラーのハンドリングをするのに役に立つ。
+
+エラーハンドリングについて、最初のエラーが発生した時点で処理は中断される。処理を継続したい場合は、Effect.eitherやEffect.optionを使ってEitherやOptionに変換する。
+
+エラーをキャッチするためには、Eitherに変換したり、Effect.catch*を使う。
+
+Effect.catchSomeは、特定のエラーをキャッチして回復するものの、エラーの型は変えない。どういう理由でこうなってるんだろう。
+
+Effect.catchIfは、キャッチするエラーを指定する熟語と、その回復方法を記述する。エラーの型は変化する（TypeScript >= 5.5の場合。絞り込みの改善で可能になった）。
+
+Effect.catchTagは、タグで指定したエラーをキャッチする。Effect.catchIfを簡略化したものだと考えられる。
+
+Effect.catchTagsは、オブジェクトのキーにタグを指定して、複数のエラーをキャッチする。catchTagsを複数回使っている場合に簡略化できる。
+
+---
+
+エラーのフォーマットは`{ errors: { body: ['message1', 'message2'] } }`のフォーマットにしよう。とりあえず、`GenericError`にエラーメッセージを指定できるようにした。エラーの変換処理はあとで実装することにして、実装を改善していこう。
+
+```bash
+curl -X POST -H "Content-Type: application/json" http://localhost:8787/users -d '{ "email": "test@example.com", "username": "testuser", "password": "pass" }' | jq
+{
+  "message": "Database error occured",
+  "_tag": "GenericError"
+}
+```
+
+ハンドラを関数に抽出したいから、ハンドラの型を取得する方法が知りたいな。
 
 ### テストが書けるように整備する
 

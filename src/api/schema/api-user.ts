@@ -10,6 +10,8 @@ const LoginUserRequest = Schema.Struct({
 	}),
 });
 
+export type LoginUserRequest = Schema.Schema.Type<typeof LoginUserRequest>;
+
 export const User = Schema.Struct({
 	bio: Schema.String,
 	email: Schema.String,
@@ -30,6 +32,8 @@ const NewUserRequest = Schema.Struct({
 	username: Schema.String,
 });
 
+export type NewUserRequest = Schema.Schema.Type<typeof NewUserRequest>;
+
 const UpdateUserRequest = Schema.partial(
 	Schema.Struct({
 		email: Schema.String,
@@ -39,6 +43,8 @@ const UpdateUserRequest = Schema.partial(
 		image: Schema.String,
 	}),
 );
+
+export type UpdateUserRequest = Schema.Schema.Type<typeof UpdateUserRequest>;
 
 const login = HttpApiEndpoint.post('login', '/users/login')
 	.setPayload(LoginUserRequest)

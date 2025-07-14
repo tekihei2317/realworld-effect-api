@@ -56,6 +56,8 @@ describe('User API', () => {
 
 			const response = yield* Effect.promise(() => handler.handler(request));
 			expect(response.status).toBe(422);
+			const data = yield* Effect.promise(() => response.json());
+			expect((data as { message: string }).message).toBe('Username is already used');
 		});
 
 		await Effect.runPromise(Effect.scoped(testProgram));
@@ -83,6 +85,8 @@ describe('User API', () => {
 
 			const response = yield* Effect.promise(() => handler.handler(request));
 			expect(response.status).toBe(422);
+			const data = yield* Effect.promise(() => response.json());
+			expect((data as { message: string }).message).toBe('Email is already used');
 		});
 
 		await Effect.runPromise(Effect.scoped(testProgram));
