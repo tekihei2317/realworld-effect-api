@@ -86,6 +86,18 @@ const createUser = ({ payload }: { payload: NewUserRequest }) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient;
 
+		// ユーザー名の重複チェック
+		const usersByUsername = yield* sql`select id from User where username = ${payload.username}`;
+		if (usersByUsername.length > 0) {
+			yield* new GenericError({ message: 'Username is already used' });
+		}
+
+		// メールアドレスの重複チェック
+		const usersByEmail = yield* sql`select userId from Auth where email = ${payload.email}`;
+		if (usersByEmail.length > 0) {
+			yield* new GenericError({ message: 'Email is already used' });
+		}
+
 		const passwordHash = yield* hashPassword(payload.password).pipe(
 			Effect.mapError(() => new GenericError({ message: 'Password hashing failed' })),
 		);
@@ -93,14 +105,14 @@ const createUser = ({ payload }: { payload: NewUserRequest }) =>
 		const userResult = yield* sql<{ id: number }>`
 			INSERT INTO User (username) VALUES (${payload.username})
 			RETURNING id
-		`.pipe(Effect.mapError(() => new GenericError({ message: 'Database error occured' })));
+		`;
 
 		const userId = userResult[0].id;
 
 		yield* sql`
 			INSERT INTO Auth (userId, email, passwordHash)
 			VALUES (${userId}, ${payload.email}, ${passwordHash})
-		`.pipe(Effect.mapError(() => new GenericError({ message: 'Database error occured' })));
+		`;
 
 		const token = yield* generateJWT({
 			id: userId.toString(),
@@ -117,7 +129,12 @@ const createUser = ({ payload }: { payload: NewUserRequest }) =>
 		};
 
 		return { user };
-	});
+	}).pipe(
+		Effect.mapError((error) => {
+			if (error._tag === 'SqlError') return new GenericError({ message: 'Database error occured' });
+			return error;
+		}),
+	);
 
 const updateCurrentUser = ({ payload }: { payload: UpdateUserRequest }) =>
 	Effect.gen(function* () {
