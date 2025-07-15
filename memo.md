@@ -11,9 +11,148 @@
 	- [x] データベースからデータを取得して返すようにする
 - [x] 残りのAPIエンドポイントの定義を作成していく。
 	- とりあえず認証だけ書いておいた
-- [ ] テストを書く。Postmanのテストの実行方法も確認しておく。
-- [ ] 認証機能を実装する。
-- [ ] APIを順番に実装していく。
+- [x] 認証機能を実装する。
+- [x] テストを書く。
+	- [x] テストを書けるように整備する
+	- [x] 認証のAPIのテストを実装する
+	- Postmanのテストの実行方法も確認しておく。
+- [] APIを順番に実装していく。
+	- [ ] 記事のAPI
+	- [ ] コメントのAPI
+	- [ ] 記事のお気に入りのAPI
+	- [ ] プロフィールのAPI
+
+知りたいことメモ
+
+- Cloudflare Workersのテスト方法。
+- EffectのAPIのテスト方法。HTTPのエンドポイントを直接実行したい。テスト用にインメモリDBを使うのもできると思う。
+- @effect/sqlのAPI。色々あるのでそれぞれがどのようなもので、どう使い分けるのかを知りたい。sqlタグで簡潔に書きたいが
+- エラーハンドリング。コンパイルエラーが出たら都度mapErrorしてその場しのぎしてるのでちゃんとやりたい。
+- Data.TaggedErrorとSchema.TaggedErrorの違いは？
+
+### 認証のAPIのテストを実装する
+
+やっとAPIの単体テストが実行できるようになったので、テストを実装していく。
+
+- ユーザー登録
+	- [x] ユーザー名、メールアドレス、パスワードを入力してユーザー登録できること
+	- [ ] フィールドが不足している場合は登録できないこと
+	- [x] ユーザー名が重複している場合は登録できないこと
+	- [x] メールアドレスが重複している場合は登録できないこと
+- ログイン
+	- [x] パスワードとメールアドレスが正しい場合はログインできること
+	- [x] パスワードが間違っている場合は認証エラーになること
+	- [x] メールアドレスが間違っている場合は認証エラーになること
+- ユーザー情報取得
+	- [x] ログインしている場合はユーザー情報を取得できること
+	- [x] ログインしていない場合は認証エラーになること
+- ユーザー情報更新
+	- 未実装
+
+ユーザー登録APIのテストを実装中。現在はどこでエラーが出ているか分からないので、異常系のテストを書きながらエラーハンドリングを改善していこう。
+
+エラーメッセージの内容は特に決まっていないと思うので、分かりやすく書く。まずはEffectのエラーハンドリングの方法を調べよう。
+
+[Expected Errors | Effect Documentation](https://effect.website/docs/error-management/expected-errors/)
+
+エラーを定義するには`Data.TaggedError`を使う？`Schema.TaggedError`を使う？
+
+エラーを表すエフェクトを作るには、`Effect.fail`を使う
+
+エラーインスタンスには`_tag`というフィールドが自動で追加され、これは`Effect.catchTag`で特定のエラーのハンドリングをするのに役に立つ。
+
+エラーハンドリングについて、最初のエラーが発生した時点で処理は中断される。処理を継続したい場合は、Effect.eitherやEffect.optionを使ってEitherやOptionに変換する。
+
+エラーをキャッチするためには、Eitherに変換したり、Effect.catch*を使う。
+
+Effect.catchSomeは、特定のエラーをキャッチして回復するものの、エラーの型は変えない。どういう理由でこうなってるんだろう。
+
+Effect.catchIfは、キャッチするエラーを指定する熟語と、その回復方法を記述する。エラーの型は変化する（TypeScript >= 5.5の場合。絞り込みの改善で可能になった）。
+
+Effect.catchTagは、タグで指定したエラーをキャッチする。Effect.catchIfを簡略化したものだと考えられる。
+
+Effect.catchTagsは、オブジェクトのキーにタグを指定して、複数のエラーをキャッチする。catchTagsを複数回使っている場合に簡略化できる。
+
+---
+
+エラーのフォーマットは`{ errors: { body: ['message1', 'message2'] } }`のフォーマットにしよう。とりあえず、`GenericError`にエラーメッセージを指定できるようにした。エラーの変換処理はあとで実装することにして、実装を改善していこう。
+
+```bash
+curl -X POST -H "Content-Type: application/json" http://localhost:8787/users -d '{ "email": "test@example.com", "username": "testuser", "password": "pass" }' | jq
+{
+  "message": "Database error occured",
+  "_tag": "GenericError"
+}
+```
+
+ハンドラを関数に抽出したいから、ハンドラの型を取得する方法が知りたいな。payloadだけ指定した。これはこれで型が違ってていてもハンドラ渡しているところだけエラーになるのでいい。tRPCの`RouterOutput`みたいな関数が欲しい。
+
+SqlErrorをcatchしてInternal Server Errorに変換できるようにしたい。`Effect.catchTag`じゃなくて、エラーを変換する関数が必要。
+
+
+### テストが書けるように整備する
+
+とりあえずインメモリDBを使いつつ、APIのハンドラをHTTPを経由せずに実行できるテストが書けた。ベタ書きなので処理を共通化する。
+
+あと、このタイプのテストはNode.jsで実行するので、Vitestのプロジェクトを定義してCloudflare Workersのテストとは別の環境で実行できるようにする。
+
+Webハンドラーを作成する処理を別ファイルに抽出した。testSqlClientを直接使っているが、テストコード側でDBにデータを入れるので、DBクライアントを渡せるように変更する必要がある。
+
+```ts
+export const testWebHandler = Effect.gen(function* () {
+	const sql = yield* testSqlClient;
+
+	const apiLive = HttpApiBuilder.api(ConduitApi).pipe(
+		Layer.provide(tagsLive),
+		Layer.provide(usersLive),
+		Layer.provide(AuthorizationLive),
+		Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
+	);
+
+	const webHandler = HttpApiBuilder.toWebHandler(Layer.mergeAll(apiLive, HttpServer.layerContext));
+
+	return webHandler;
+});
+```
+
+テスト用のクライアントの型が`Effect.Effect<SqlClient, SqlError, Scope>`で、これを`SqlClient`を必要とするエフェクトに渡してから実行したい。どうすればいい？
+
+エフェクトの中でyield*してSqlClientを取り出してから、provideServiceを実行するとできた。これでいいのかな。
+
+それから、Layer.Effectでレイヤーを作ってからLayer.provideするとかもできるかも？←やってみたけど分からなかった。
+
+SqlClientを各テストで使い回そうと思ったけれど、`yield*`する度に毎回作成されているような気がする。Effectを返す関数じゃなくて、Effectを返すだけでもリセットされそうだ。←そうでした。毎回create tableでスキーマ作ってるので、そこは今後改善の必要があるかも。
+
+### 認証機能を実装する
+
+まず、認証機能を実装するにあたって必要そうな、ミドルウェアなどの機能を確認する。
+
+トークンでの認証なので、トークンを検証してユーザー情報をハンドラからアクセスできる場所に入れる、トークンが不正な場合は認証エラーを出す、というようなミドルウェアが作れればよい。
+
+Bearerトークンってなんだっけ...？仕様とかあるのかな。
+
+Bearerトークンの認証が用意されているが、使い方が分からない。
+
+Authorizationをprovideしないといけないんだけど、どうしようね。
+
+分からなかったのでClaude Codeに書き進めてもらう。HttpApiSecurityを使って新しいルールを作ればいいらしい。
+
+---
+
+あとはjwtのエンコード、デコード処理を実装すればOK。jwtの実装は
+
+- jose
+- jsonwebtoken
+
+のどちらかを使えば良さそう。よく分からないので全部やってもらった。これなんとかしたいね。
+
+---
+
+次はデータベースの登録処理を実装する。INSERT、UPDATEの実装方法を確認する。
+
+SqlResolverを使う方法と、sqlタグを使う方法がある。APIが複数用意されているので確認したい。あとトランザクションの書き方を調べる。
+
+エラーハンドリングがガバガバだが、そこはテストを書いてから修正することにして次に進む。
 
 ### 残りのAPIエンドポイントの定義を作成していく
 

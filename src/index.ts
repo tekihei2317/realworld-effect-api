@@ -1,4 +1,4 @@
-import { createWebHandler } from './api-impl';
+import { createWebHandler } from './api/api-impl';
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {

@@ -1,6 +1,7 @@
 import { HttpApiEndpoint, HttpApiError, HttpApiGroup } from '@effect/platform';
 import { Schema } from 'effect';
-import { GenericError } from './shared';
+import { GenericError } from '../shared';
+import { Authorization } from '../../authentication';
 
 const LoginUserRequest = Schema.Struct({
 	user: Schema.Struct({
@@ -9,7 +10,9 @@ const LoginUserRequest = Schema.Struct({
 	}),
 });
 
-const User = Schema.Struct({
+export type LoginUserRequest = Schema.Schema.Type<typeof LoginUserRequest>;
+
+export const User = Schema.Struct({
 	bio: Schema.String,
 	email: Schema.String,
 	image: Schema.String,
@@ -17,7 +20,9 @@ const User = Schema.Struct({
 	username: Schema.String,
 });
 
-const UserResponse = Schema.Struct({
+export type User = Schema.Schema.Type<typeof User>;
+
+export const UserResponse = Schema.Struct({
 	user: User,
 });
 
@@ -26,6 +31,8 @@ const NewUserRequest = Schema.Struct({
 	password: Schema.String,
 	username: Schema.String,
 });
+
+export type NewUserRequest = Schema.Schema.Type<typeof NewUserRequest>;
 
 const UpdateUserRequest = Schema.partial(
 	Schema.Struct({
@@ -36,6 +43,8 @@ const UpdateUserRequest = Schema.partial(
 		image: Schema.String,
 	}),
 );
+
+export type UpdateUserRequest = Schema.Schema.Type<typeof UpdateUserRequest>;
 
 const login = HttpApiEndpoint.post('login', '/users/login')
 	.setPayload(LoginUserRequest)
@@ -51,7 +60,8 @@ const createUser = HttpApiEndpoint.post('createUser', '/users')
 const getCurrentUser = HttpApiEndpoint.get('getCurrentUser', '/user')
 	.addSuccess(UserResponse)
 	.addError(HttpApiError.Unauthorized)
-	.addError(GenericError, { status: 422 });
+	.addError(GenericError, { status: 422 })
+	.middleware(Authorization);
 
 const updateCurrentUser = HttpApiEndpoint.put('updateCurrentUser', '/user')
 	.setPayload(UpdateUserRequest)
