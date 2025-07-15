@@ -1,33 +1,33 @@
 {
-	"name": "realworld-effect-api",
-	"version": "0.0.0",
-	"private": true,
-	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"test": "vitest",
-		"test:node": "vitest --config vitest.config.node.mts",
-		"format": "prettier --write .",
-		"format:check": "prettier --check .",
-		"cf-typegen": "wrangler types"
-	},
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.8.19",
-		"@types/node": "^24.0.13",
-		"prettier": "^3.6.2",
-		"typescript": "^5.5.2",
-		"vitest": "~3.2.0",
-		"wrangler": "^4.24.3"
-	},
-	"dependencies": {
-		"@effect/experimental": "^0.51.13",
-		"@effect/platform": "^0.87.12",
-		"@effect/sql": "^0.40.13",
-		"@effect/sql-d1": "^0.38.13",
-		"@effect/sql-sqlite-node": "^0.41.13",
-		"bcryptjs": "^3.0.2",
-		"effect": "^3.16.12",
-		"jose": "^6.0.11"
-	}
+  "name": "realworld-effect-api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "test": "vitest",
+    "test:node": "vitest --config vitest.config.node.mts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "cf-typegen": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.19",
+    "@types/node": "^24.0.13",
+    "prettier": "^3.6.2",
+    "typescript": "^5.5.2",
+    "vitest": "~3.2.0",
+    "wrangler": "^4.24.3"
+  },
+  "dependencies": {
+    "@effect/experimental": "^0.51.13",
+    "@effect/platform": "^0.87.12",
+    "@effect/sql": "^0.40.13",
+    "@effect/sql-d1": "^0.38.13",
+    "@effect/sql-sqlite-node": "^0.41.13",
+    "bcryptjs": "^3.0.2",
+    "effect": "^3.16.12",
+    "jose": "^6.0.11"
+  }
 }

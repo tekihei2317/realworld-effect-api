@@ -12,37 +12,37 @@ import { usersLive } from './api-user-impl';
 import { AuthorizationLive } from '../authentication';
 
 const loadMigration = async () => {
-	return fs.readFile(path.resolve(__dirname, '../../migrations/0001_init.sql'), 'utf-8');
+  return fs.readFile(path.resolve(__dirname, '../../migrations/0001_init.sql'), 'utf-8');
 };
 
 const sqlClient = SqliteClient.make({
-	filename: ':memory:',
+  filename: ':memory:',
 }).pipe(Effect.provide(Reactivity.layer));
 
 export const testSqlClient = Effect.gen(function* () {
-	const sql = yield* sqlClient;
-	const migrationSql = yield* Effect.promise(() => loadMigration());
-	const statements = migrationSql.split(';').map((stmt) => stmt.trim());
+  const sql = yield* sqlClient;
+  const migrationSql = yield* Effect.promise(() => loadMigration());
+  const statements = migrationSql.split(';').map((stmt) => stmt.trim());
 
-	for (const statement of statements) {
-		if (statement) {
-			yield* sql.unsafe(statement);
-		}
-	}
-	return sql;
+  for (const statement of statements) {
+    if (statement) {
+      yield* sql.unsafe(statement);
+    }
+  }
+  return sql;
 });
 
 export const testWebHandler = Effect.gen(function* () {
-	const sql = yield* SqlClient.SqlClient;
+  const sql = yield* SqlClient.SqlClient;
 
-	const apiLive = HttpApiBuilder.api(ConduitApi).pipe(
-		Layer.provide(tagsLive),
-		Layer.provide(usersLive),
-		Layer.provide(AuthorizationLive),
-		Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
-	);
+  const apiLive = HttpApiBuilder.api(ConduitApi).pipe(
+    Layer.provide(tagsLive),
+    Layer.provide(usersLive),
+    Layer.provide(AuthorizationLive),
+    Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
+  );
 
-	const webHandler = HttpApiBuilder.toWebHandler(Layer.mergeAll(apiLive, HttpServer.layerContext));
+  const webHandler = HttpApiBuilder.toWebHandler(Layer.mergeAll(apiLive, HttpServer.layerContext));
 
-	return webHandler;
+  return webHandler;
 });
