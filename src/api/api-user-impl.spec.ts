@@ -3,6 +3,7 @@ import { Effect } from 'effect';
 import { testSqlClient, testWebHandler } from './api-test-utils';
 import { SqlClient } from '@effect/sql';
 import { hashPassword } from '../password';
+import { generateJWT } from '../jwt';
 
 describe('createUser', () => {
 	it('ユーザー登録ができること', async () => {
@@ -116,8 +117,6 @@ describe('login', () => {
 			});
 
 			const response = yield* Effect.promise(() => handler.handler(request));
-			const data = yield* Effect.promise(() => response.json());
-			console.log({ response, data });
 			expect(response.status).toBe(200);
 		});
 
@@ -179,6 +178,116 @@ describe('login', () => {
 
 			expect(response.status).toBe(422);
 			expect(data.message).toBe('email or password is invalid');
+		});
+
+		await Effect.runPromise(Effect.scoped(testProgram));
+	});
+});
+
+describe('currentUser', () => {
+	it('ログイン中のユーザーを取得できること', async () => {
+		const testProgram = Effect.gen(function* () {
+			const sql = yield* testSqlClient;
+			const handler = yield* testWebHandler.pipe(Effect.provideService(SqlClient.SqlClient, sql));
+
+			// データベースにユーザーを登録する
+			const user = {
+				id: 1,
+				username: 'testuser',
+				email: 'test@example.com',
+				bio: 'my name is testuser',
+				image: 'https://example.com/testuser/image',
+			};
+			yield* sql`insert into User (id, username, bio, profileImageUrl)
+        values (${user.id}, ${user.username}, ${user.bio}, ${user.image})`;
+
+			// トークンを作成する
+			const token = yield* generateJWT({
+				id: user.id.toString(),
+				username: user.username,
+				email: user.email,
+			});
+
+			// トークンと一緒にリクエストを送信する
+			const request = new Request('http://localhost/user', {
+				headers: { 'Content-Type': 'application/json', Authorization: `Token ${token}` },
+			});
+			const response = yield* Effect.promise(() => handler.handler(request));
+			const data: any = yield* Effect.promise(() => response.json());
+
+			expect(response.status).toBe(200);
+			expect(data).toMatchObject({
+				user: {
+					username: user.username,
+					email: user.email,
+					bio: user.bio,
+					image: user.image,
+					token,
+				},
+			});
+		});
+
+		await Effect.runPromise(Effect.scoped(testProgram));
+	});
+
+	it('ログイントークンがない場合は認証エラーになること', async () => {
+		const testProgram = Effect.gen(function* () {
+			const sql = yield* testSqlClient;
+			const handler = yield* testWebHandler.pipe(Effect.provideService(SqlClient.SqlClient, sql));
+
+			// データベースにユーザーを登録する
+			const user = {
+				id: 1,
+				username: 'testuser',
+				email: 'test@example.com',
+				bio: 'my name is testuser',
+				image: 'https://example.com/testuser/image',
+			};
+			yield* sql`insert into User (id, username, bio, profileImageUrl)
+        values (${user.id}, ${user.username}, ${user.bio}, ${user.image})`;
+
+			// トークンなしでリクエストを送信
+			const request = new Request('http://localhost/user', {
+				headers: { 'Content-Type': 'application/json' },
+			});
+			const response = yield* Effect.promise(() => handler.handler(request));
+			const data: any = yield* Effect.promise(() => response.json());
+
+			expect(response.status).toBe(401);
+			expect(data).toEqual({ _tag: 'Unauthorized' });
+		});
+
+		await Effect.runPromise(Effect.scoped(testProgram));
+	});
+
+	it('ログイントークンが間違っている場合は認証エラーになること', async () => {
+		const testProgram = Effect.gen(function* () {
+			const sql = yield* testSqlClient;
+			const handler = yield* testWebHandler.pipe(Effect.provideService(SqlClient.SqlClient, sql));
+
+			// データベースにユーザーを登録する
+			const user = {
+				id: 1,
+				username: 'testuser',
+				email: 'test@example.com',
+				bio: 'my name is testuser',
+				image: 'https://example.com/testuser/image',
+			};
+			yield* sql`insert into User (id, username, bio, profileImageUrl)
+        values (${user.id}, ${user.username}, ${user.bio}, ${user.image})`;
+
+			// 不正なトークンでリクエストを送信
+			const request = new Request('http://localhost/user', {
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: 'Token invalid',
+				},
+			});
+			const response = yield* Effect.promise(() => handler.handler(request));
+			const data: any = yield* Effect.promise(() => response.json());
+
+			expect(response.status).toBe(401);
+			expect(data).toEqual({ _tag: 'Unauthorized' });
 		});
 
 		await Effect.runPromise(Effect.scoped(testProgram));

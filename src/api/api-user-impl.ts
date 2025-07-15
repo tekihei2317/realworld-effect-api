@@ -19,17 +19,32 @@ const getCurrentUser = () =>
 			email: user.email,
 		}).pipe(Effect.mapError(() => new GenericError({ message: 'jwt generation failed' })));
 
+		const sql = yield* SqlClient.SqlClient;
+		const users = yield* sql<{
+			bio: string;
+			image: string;
+		}>`select bio, profileImageUrl as image from User where id = ${user.id}`;
+
+		if (users[0] === undefined) {
+			// TODO: システムエラーにする
+			yield* new GenericError({ message: `User record with id = ${user.id} does not exist` });
+		}
+
 		return {
 			user: {
-				bio: 'I work at statefarm',
+				bio: users[0].bio,
 				email: user.email,
-				image: 'https://i.stack.imgur.com/xHWG8.jpg',
+				image: users[0].image,
 				token,
 				username: user.username,
 			},
 		};
-	});
-
+	}).pipe(
+		Effect.mapError((error) => {
+			if (error._tag === 'SqlError') return new GenericError({ message: 'Database error occured' });
+			return error;
+		}),
+	);
 const login = ({ payload }: { payload: LoginUserRequest }) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient;

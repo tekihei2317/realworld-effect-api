@@ -5,7 +5,8 @@ import * as bcrypt from 'bcryptjs';
 export const hashPassword = (password: string): Effect.Effect<string, Error> =>
 	Effect.tryPromise({
 		try: async () => {
-			const saltRounds = 12;
+			// テスト環境では低いroundsを使用してパフォーマンスを向上
+			const saltRounds = process.env.NODE_ENV === 'test' ? 4 : 12;
 			return await bcrypt.hash(password, saltRounds);
 		},
 		catch: (error) => new Error(`Password hashing failed: ${error}`),
