@@ -130,7 +130,7 @@ if (import.meta.vitest) {
           username: user.username,
           bio: null,
           image: null,
-          isFollowing: false,
+          following: false,
         });
       });
 

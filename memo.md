@@ -36,6 +36,8 @@
 
 データベースがnullableのとき、パースするスキーマをnullableにしないといけない。Schemaをnullableにするには`Schema.NullOr`を使う。似た用途のものに`Schema.UndefinedOr`、`Schema.NullishOr`（nullまたはundefined）がある。
 
+`Effect<{ profile: Option<Profile> }>`を`Effect<Profile, GenericError>`に変換したい。
+
 
 ### APIを順番に実装していく（プロフィールAPI）
 
