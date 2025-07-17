@@ -56,7 +56,7 @@ export const followUser = ({
 
     const followees = yield* sql<{ id: number }>`select id from User where username = ${username}`;
     if (followees.length === 0) {
-      return yield* new GenericError({ message: 'following user not found' });
+      return yield* new GenericError({ message: 'User not found' });
     }
     const followee = followees[0];
 
@@ -90,7 +90,7 @@ export const unfollowUser = ({
 
     const followees = yield* sql<{ id: number }>`select id from User where username = ${username}`;
     if (followees.length === 0) {
-      return yield* new GenericError({ message: 'following user not found' });
+      return yield* new GenericError({ message: 'User not found' });
     }
     const followee = followees[0];
 

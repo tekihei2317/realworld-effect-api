@@ -16,18 +16,18 @@ const ProfileResponse = Schema.Struct({
 
 const UsernamePath = Schema.Struct({ username: Schema.String });
 
-const getProfile = HttpApiEndpoint.get('getProfile', '/profile/:username')
+const getProfile = HttpApiEndpoint.get('getProfile', '/profiles/:username')
   .setPath(UsernamePath)
   .addSuccess(ProfileResponse)
   .addError(GenericError, { status: 422 });
 
-const followUser = HttpApiEndpoint.post('followUser', '/profile/:username/follow')
+const followUser = HttpApiEndpoint.post('followUser', '/profiles/:username/follow')
   .setPath(UsernamePath)
   .middleware(Authorization)
   .addSuccess(ProfileResponse)
   .addError(GenericError, { status: 422 });
 
-const unfollowUser = HttpApiEndpoint.del('unfollowUser', '/profile/:username')
+const unfollowUser = HttpApiEndpoint.del('unfollowUser', '/profiles/:username')
   .setPath(UsernamePath)
   .middleware(Authorization)
   .addSuccess(ProfileResponse)
