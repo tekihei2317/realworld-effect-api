@@ -1,28 +1,33 @@
 import { SqlClient, SqlSchema } from '@effect/sql';
 import { Effect, Option, pipe, Schema } from 'effect';
 import { testSqlClient } from '../api/api-test-utils';
+import { GenericError } from '../api/shared';
 
 const Profile = Schema.Struct({
   username: Schema.String,
-  bio: Schema.String,
-  image: Schema.String,
+  bio: Schema.NullOr(Schema.String),
+  image: Schema.NullOr(Schema.String),
   following: Schema.Boolean,
 });
 
 /**
  * ユーザーのプロフィールをユーザー名で取得する
  */
-export const getProfile = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient;
-  const query = SqlSchema.findOne({
-    Request: Schema.Struct({ username: Schema.String }),
-    Result: Profile.omit('following'),
-    execute: ({ username }) =>
-      sql`select username, bio, profileImageUrl as image from User where username = ${username}`,
-  });
+export const getProfile = ({ username }: { username: string }) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const query = SqlSchema.findOne({
+      Request: Schema.Struct({ username: Schema.String }),
+      Result: Profile.omit('following'),
+      execute: ({ username }) =>
+        sql`select username, bio, profileImageUrl as image from User where username = ${username}`,
+    });
+    const profileWithoutIsFollowing = yield* query({ username });
 
-  return query;
-});
+    // TODO: ログインユーザーがフォローしているかどうかを取得する
+    const following = false;
+    return Option.map(profileWithoutIsFollowing, (user) => ({ ...user, following }));
+  });
 
 const getIsFollowingQuery = Effect.map(SqlClient.SqlClient, (sql) =>
   SqlSchema.findOne({
@@ -37,6 +42,68 @@ const getIsFollowingQuery = Effect.map(SqlClient.SqlClient, (sql) =>
 );
 
 /**
+ * ユーザーをフォローし、プロフィールを返す
+ */
+export const followUser = ({
+  currentUserId,
+  username,
+}: {
+  currentUserId: number;
+  username: string;
+}) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+
+    const followees = yield* sql<{ id: number }>`select id from User where username = ${username}`;
+    if (followees.length === 0) {
+      return yield* new GenericError({ message: 'following user not found' });
+    }
+    const followee = followees[0];
+
+    // フォローを探す
+    const followings = yield* sql<{ followerId: number; followeeId: number }>`
+      select followerId, followeeId
+      from Follow
+      where followerId = ${currentUserId} and followeeId = ${followee.id}
+    `;
+
+    if (followings.length === 0) {
+      // 未フォローなのでフォローする
+      yield* sql`insert into Follow (followerId, followeeId) values (${currentUserId}, ${followee.id})`;
+    }
+
+    return yield* getProfile({ username });
+  });
+
+/**
+ * ユーザーのフォローを解除し、プロフィールを返す
+ */
+export const unfollowUser = ({
+  currentUserId,
+  username,
+}: {
+  currentUserId: number;
+  username: string;
+}) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+
+    const followees = yield* sql<{ id: number }>`select id from User where username = ${username}`;
+    if (followees.length === 0) {
+      return yield* new GenericError({ message: 'following user not found' });
+    }
+    const followee = followees[0];
+
+    // フォローを解除する
+    yield* sql`
+      delete from Follow
+      where followerId = ${currentUserId} and followeeId = ${followee.id}
+    `;
+
+    return yield* getProfile({ username });
+  });
+
+/**
  * 特定のユーザーが、他のユーザーをフォローしているかを取得する
  */
 const getIsFollowing = ({ followerId, followeeId }: { followerId: number; followeeId: number }) =>
@@ -47,6 +114,31 @@ const getIsFollowing = ({ followerId, followeeId }: { followerId: number; follow
 
 if (import.meta.vitest) {
   const { describe, it, expect } = import.meta.vitest;
+
+  describe('getProfile', () => {
+    it('プロフィールを取得できること', async () => {
+      const test = Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const user = (yield* sql<{
+          id: number;
+          username: string;
+        }>`insert into User (username) values ('user1') returning id, username`)[0];
+
+        const profile = yield* getProfile({ username: user.username });
+
+        expect(Option.getOrNull(profile)).toEqual({
+          username: user.username,
+          bio: null,
+          image: null,
+          isFollowing: false,
+        });
+      });
+
+      await Effect.runPromise(
+        Effect.scoped(test.pipe(Effect.provideServiceEffect(SqlClient.SqlClient, testSqlClient))),
+      );
+    });
+  });
 
   describe('getIsFollowing', () => {
     it('フォローしている場合はtrueになること', async () => {

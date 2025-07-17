@@ -5,8 +5,8 @@ import { Authorization } from '../../authentication';
 
 const Profile = Schema.Struct({
   username: Schema.String,
-  image: Schema.String,
-  bio: Schema.String,
+  image: Schema.NullOr(Schema.String),
+  bio: Schema.NullOr(Schema.String),
   following: Schema.Boolean,
 });
 

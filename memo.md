@@ -30,6 +30,13 @@
 - エラーハンドリング。コンパイルエラーが出たら都度mapErrorしてその場しのぎしてるのでちゃんとやりたい。
 - Data.TaggedErrorとSchema.TaggedErrorの違いは？
 
+### APIを順番に実装していく（プロフィールAPI Part2）
+
+認証が任意、っていうのが難しいな〜。Authorizationミドルウェア使ったらエラーになっちゃうので。とりあえずログインしていない前提で実装してみよう。
+
+データベースがnullableのとき、パースするスキーマをnullableにしないといけない。Schemaをnullableにするには`Schema.NullOr`を使う。似た用途のものに`Schema.UndefinedOr`、`Schema.NullishOr`（nullまたはundefined）がある。
+
+
 ### APIを順番に実装していく（プロフィールAPI）
 
 APIのエンドポイントにパスパラメータがある。パスに`/profile/:username`のように定義して、Schemaでusernameのバリデーションを書く。この方法はコードはわかりやすいが、型安全ではない（パスパラメータ名とスキーマが一致しなくてもコンパイルエラーにならない）ので注意が必要。
@@ -116,10 +123,6 @@ const getIsFollowingImproved = ({ followerId, followeeId }: GetIsFollowingInput)
 ```
 
 その関数がエフェクトを返すのか値を返すのかで、flatMapとmapを使い分ける必要がある。andThenはどっちでも対応できるので便利。
-
----
-
-Next: プロフィールAPIの実装から
 
 ### APIを順番に実装していく
 
