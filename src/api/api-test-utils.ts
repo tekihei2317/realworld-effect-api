@@ -9,6 +9,7 @@ import path from 'node:path';
 import { ConduitApi } from './schema';
 import { tagsLive } from './api-tag-impl';
 import { usersLive } from './api-user-impl';
+import { profileLive } from './api-profile-impl';
 import { AuthorizationLive } from '../authentication';
 
 const loadMigration = async () => {
@@ -38,6 +39,7 @@ export const testWebHandler = Effect.gen(function* () {
   const apiLive = HttpApiBuilder.api(ConduitApi).pipe(
     Layer.provide(tagsLive),
     Layer.provide(usersLive),
+    Layer.provide(profileLive),
     Layer.provide(AuthorizationLive),
     Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
   );

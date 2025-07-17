@@ -30,6 +30,124 @@
 - エラーハンドリング。コンパイルエラーが出たら都度mapErrorしてその場しのぎしてるのでちゃんとやりたい。
 - Data.TaggedErrorとSchema.TaggedErrorの違いは？
 
+### APIを順番に実装していく（プロフィールAPI Part2）
+
+認証が任意、っていうのが難しいな〜。Authorizationミドルウェア使ったらエラーになっちゃうので。とりあえずログインしていない前提で実装してみよう。
+
+データベースがnullableのとき、パースするスキーマをnullableにしないといけない。Schemaをnullableにするには`Schema.NullOr`を使う。似た用途のものに`Schema.UndefinedOr`、`Schema.NullishOr`（nullまたはundefined）がある。
+
+`Effect<{ profile: Option<Profile> }>`を`Effect<Profile, GenericError>`に変換したい。
+
+
+### APIを順番に実装していく（プロフィールAPI）
+
+APIのエンドポイントにパスパラメータがある。パスに`/profile/:username`のように定義して、Schemaでusernameのバリデーションを書く。この方法はコードはわかりやすいが、型安全ではない（パスパラメータ名とスキーマが一致しなくてもコンパイルエラーにならない）ので注意が必要。
+
+```ts
+const getProfile = HttpApiEndpoint.get('getProfile', '/profile/:username')
+  .setPath(UsernamePath)
+  .addSuccess(ProfileResponse)
+  .addError(GenericError, { status: 422 });
+```
+
+APIのスキーマは定義できたので実装に進んでいく。まずはDB周りのコードを書いてテストするところから始めよう。クエリは`SqlResolver`ではなく`SqlSchema`で書いた方がシンプルになるのでこちらを使う。
+
+これ、エフェクトを返すエフェクトになってしまっているので直せそうな気がする。前にもyield* (yield* effect)みたいなことがあったのでそれも同様。
+
+```ts
+export const getIsFollowing = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+
+  const query = SqlSchema.findOne({
+    Request: Schema.Struct({ followerId: Schema.Number, followeeId: Schema.Number }),
+    Result: Schema.Struct({ isFollowing: Schema.Literal(1) }),
+    execute: ({ followerId, followeeId }) => sql`
+      select 1 as isFollowing from Follow
+      where followerId = ${followerId} and followeeId = ${followeeId}
+    `,
+  });
+
+  return ({ followerId, followeeId }: { followerId: number; followeeId: number }) =>
+    Effect.gen(function* () {
+      const result = yield* query({ followerId, followeeId });
+
+      return Option.match(result, {
+        onSome: () => ({ isFollowing: true }),
+        onNone: () => ({ isFollowing: false }),
+      });
+    });
+});
+```
+
+[Building Pipelines | Effect Documentation](https://effect.website/docs/getting-started/building-pipelines/)
+
+ここを読んで見ることにする。なんかやりたいことに対して書く量が多くて疲れちゃったな...まぁ慣れてないのが原因だと思うけど。
+
+アプリケーションをパイプラインで構築することは、いくつかの関数に分けることになるのでいくつかの利点がある。
+
+pipeは引数と戻り値が1つだけの関数を繋ぐ。`pipe(input, func1, func2, ...)`。
+
+mapは、エフェクトの値を関数で変換する。`Effect.map(effect, transformation)`。
+
+flatMapは、エフェクトの値を、エフェクトを返す関数で変換する。`Effect.flatMap(effect, transformation)`。
+
+andThenは、mapとしてもflatMapとしても使うことができる。他にもEffectやPromiseを受け取れる。
+
+map: 値を返す関数を受け取る
+flatMap: エフェクトを返す関数を受け取る
+andThen: 値を返す関数（map）、エフェクトを返す関数（flatMap）、エフェクト、Promiseなどを受け取れる。
+
+---
+
+なんとなく分かってきた気がするので、上のコードを書き換えてみる。一応これでできた。引数の型定義部分が冗長だが、実装部分は綺麗だ。
+
+```ts
+const getIsFollowingQuery = Effect.map(SqlClient.SqlClient, (sql) =>
+  SqlSchema.findOne({
+    Request: Schema.Struct({ followerId: Schema.Number, followeeId: Schema.Number }),
+    Result: Schema.Struct({ isFollowing: Schema.Literal(1) }),
+    execute: ({ followerId, followeeId }) =>
+      sql`
+      select 1 as isFollowing from Follow
+      where followerId = ${followerId} and followeeId = ${followeeId}
+    `,
+  }),
+);
+
+type GetIsFollowingInput = { followerId: number; followeeId: number };
+
+const getIsFollowingImproved = ({ followerId, followeeId }: GetIsFollowingInput) =>
+  pipe(
+    Effect.flatMap(getIsFollowingQuery, (query) => query({ followerId, followeeId })),
+    Effect.map((user) => ({ isFollowing: Option.isSome(user) })),
+  );
+
+```
+
+その関数がエフェクトを返すのか値を返すのかで、flatMapとmapを使い分ける必要がある。andThenはどっちでも対応できるので便利。
+
+### APIを順番に実装していく
+
+まずはAPIの仕様を確認して、どの順番で作っていくべきかを考えよう。
+
+- プロフィール
+	- 特定のユーザーの情報を取得する。認証は任意。フォローしているかどうかがレスポンスに含まれている。
+	-	特定のユーザーをフォロー・アンフォローする。認証が必要。
+- 記事
+	- 記事の一覧を取得する。タグ、著者、お気に入りしているかどうか、ページング等の検索処理がある。
+	- フィード。フォローしているユーザーの記事の一覧を表示する。
+	- 記事の取得。認証は不要。
+	- 記事の投稿、更新、削除。
+- コメント
+	- 記事にコメントする、記事のコメントを取得する、コメントを削除する
+- お気に入り
+	- 記事をお気に入りする、お気に入りを解除する
+
+プロフィールは独立している。コメントとお気に入りは記事に依存している。なので、プロフィール→記事→コメント/お気に入りの順番で作っていこう。
+
+まずはプロフィールのAPIを作成する。
+
+
 ### 認証のAPIのテストを実装する
 
 やっとAPIの単体テストが実行できるようになったので、テストを実装していく。

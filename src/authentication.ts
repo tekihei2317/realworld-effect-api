@@ -46,8 +46,6 @@ const validateJWTToken = (token: string): Effect.Effect<User, Unauthorized> =>
 export const AuthorizationLive = Layer.effect(
   Authorization,
   Effect.gen(function* () {
-    yield* Effect.log('creating Authorization middleware');
-
     return {
       token: (authHeader) =>
         Effect.gen(function* () {
@@ -55,7 +53,6 @@ export const AuthorizationLive = Layer.effect(
 
           // "Token jwt.token.here" から "jwt.token.here" を抽出
           if (!headerValue.startsWith('Token ')) {
-            yield* Effect.log('Invalid auth header format, expected "Token <jwt>"');
             yield* Effect.fail(new Unauthorized());
           }
 
