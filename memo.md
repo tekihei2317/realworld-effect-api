@@ -70,6 +70,56 @@ export const getIsFollowing = Effect.gen(function* () {
 });
 ```
 
+[Building Pipelines | Effect Documentation](https://effect.website/docs/getting-started/building-pipelines/)
+
+ここを読んで見ることにする。なんかやりたいことに対して書く量が多くて疲れちゃったな...まぁ慣れてないのが原因だと思うけど。
+
+アプリケーションをパイプラインで構築することは、いくつかの関数に分けることになるのでいくつかの利点がある。
+
+pipeは引数と戻り値が1つだけの関数を繋ぐ。`pipe(input, func1, func2, ...)`。
+
+mapは、エフェクトの値を関数で変換する。`Effect.map(effect, transformation)`。
+
+flatMapは、エフェクトの値を、エフェクトを返す関数で変換する。`Effect.flatMap(effect, transformation)`。
+
+andThenは、mapとしてもflatMapとしても使うことができる。他にもEffectやPromiseを受け取れる。
+
+map: 値を返す関数を受け取る
+flatMap: エフェクトを返す関数を受け取る
+andThen: 値を返す関数（map）、エフェクトを返す関数（flatMap）、エフェクト、Promiseなどを受け取れる。
+
+---
+
+なんとなく分かってきた気がするので、上のコードを書き換えてみる。一応これでできた。引数の型定義部分が冗長だが、実装部分は綺麗だ。
+
+```ts
+const getIsFollowingQuery = Effect.map(SqlClient.SqlClient, (sql) =>
+  SqlSchema.findOne({
+    Request: Schema.Struct({ followerId: Schema.Number, followeeId: Schema.Number }),
+    Result: Schema.Struct({ isFollowing: Schema.Literal(1) }),
+    execute: ({ followerId, followeeId }) =>
+      sql`
+      select 1 as isFollowing from Follow
+      where followerId = ${followerId} and followeeId = ${followeeId}
+    `,
+  }),
+);
+
+type GetIsFollowingInput = { followerId: number; followeeId: number };
+
+const getIsFollowingImproved = ({ followerId, followeeId }: GetIsFollowingInput) =>
+  pipe(
+    Effect.flatMap(getIsFollowingQuery, (query) => query({ followerId, followeeId })),
+    Effect.map((user) => ({ isFollowing: Option.isSome(user) })),
+  );
+
+```
+
+その関数がエフェクトを返すのか値を返すのかで、flatMapとmapを使い分ける必要がある。andThenはどっちでも対応できるので便利。
+
+---
+
+Next: プロフィールAPIの実装から
 
 ### APIを順番に実装していく
 

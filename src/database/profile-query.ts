@@ -1,5 +1,5 @@
 import { SqlClient, SqlSchema } from '@effect/sql';
-import { Effect, Option, Schema } from 'effect';
+import { Effect, Option, pipe, Schema } from 'effect';
 import { testSqlClient } from '../api/api-test-utils';
 
 const Profile = Schema.Struct({
@@ -24,29 +24,26 @@ export const getProfile = Effect.gen(function* () {
   return query;
 });
 
+const getIsFollowingQuery = Effect.map(SqlClient.SqlClient, (sql) =>
+  SqlSchema.findOne({
+    Request: Schema.Struct({ followerId: Schema.Number, followeeId: Schema.Number }),
+    Result: Schema.Struct({ isFollowing: Schema.Literal(1) }),
+    execute: ({ followerId, followeeId }) =>
+      sql`
+        select 1 as isFollowing from Follow
+        where followerId = ${followerId} and followeeId = ${followeeId}
+      `,
+  }),
+);
+
 /**
  * 特定のユーザーが、他のユーザーをフォローしているかを取得する
  */
-export const getIsFollowing = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient;
-
-  const query = SqlSchema.findOne({
-    Request: Schema.Struct({ followerId: Schema.Number, followeeId: Schema.Number }),
-    Result: Schema.Struct({ isFollowing: Schema.Literal(1) }),
-    execute: ({ followerId, followeeId }) => sql`
-      select 1 as isFollowing from Follow
-      where followerId = ${followerId} and followeeId = ${followeeId}
-    `,
-  });
-
-  return ({ followerId, followeeId }: { followerId: number; followeeId: number }) =>
-    Effect.map(query({ followerId, followeeId }), (result) =>
-      Option.match(result, {
-        onSome: () => ({ isFollowing: true }),
-        onNone: () => ({ isFollowing: false }),
-      }),
-    );
-});
+const getIsFollowing = ({ followerId, followeeId }: { followerId: number; followeeId: number }) =>
+  pipe(
+    Effect.flatMap(getIsFollowingQuery, (query) => query({ followerId, followeeId })),
+    Effect.map((user) => ({ isFollowing: Option.isSome(user) })),
+  );
 
 if (import.meta.vitest) {
   const { describe, it, expect } = import.meta.vitest;
@@ -64,7 +61,7 @@ if (import.meta.vitest) {
         }>`insert into User (username) values ('user2') returning id`)[0];
         yield* sql`insert into Follow (followerId, followeeId) values (${user1.id}, ${user2.id})`;
 
-        const result = yield* (yield* getIsFollowing)({
+        const result = yield* getIsFollowing({
           followerId: user1.id,
           followeeId: user2.id,
         });
@@ -87,7 +84,7 @@ if (import.meta.vitest) {
           id: number;
         }>`insert into User (username) values ('user2') returning id`)[0];
 
-        const result = yield* (yield* getIsFollowing)({
+        const result = yield* getIsFollowing({
           followerId: user1.id,
           followeeId: user2.id,
         });
